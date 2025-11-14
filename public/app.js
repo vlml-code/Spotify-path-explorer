@@ -61,8 +61,44 @@ function parseCSV(csvText) {
     return rows;
 }
 
-// Geocoding cache for common locations
-const locationCache = {};
+// Geocoding cache - load from localStorage on startup
+const CACHE_KEY = 'artistExplorer_geocodeCache';
+const CACHE_VERSION = 1;
+let locationCache = {};
+
+// Load geocoding cache from localStorage
+function loadGeocodingCache() {
+    try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            const data = JSON.parse(cached);
+            if (data.version === CACHE_VERSION) {
+                locationCache = data.cache || {};
+                console.log(`[Cache] Loaded ${Object.keys(locationCache).length} cached locations from localStorage`);
+            } else {
+                console.log('[Cache] Cache version mismatch, starting fresh');
+                localStorage.removeItem(CACHE_KEY);
+            }
+        }
+    } catch (error) {
+        console.error('[Cache] Error loading cache:', error);
+    }
+}
+
+// Save geocoding cache to localStorage
+function saveGeocodingCache() {
+    try {
+        const data = {
+            version: CACHE_VERSION,
+            cache: locationCache,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        console.log(`[Cache] Saved ${Object.keys(locationCache).length} locations to localStorage`);
+    } catch (error) {
+        console.error('[Cache] Error saving cache:', error);
+    }
+}
 
 // Simple geocoding function with fallback
 async function geocodeLocation(location) {
@@ -70,7 +106,7 @@ async function geocodeLocation(location) {
 
     const locationKey = location.toLowerCase().trim();
 
-    // Check cache first
+    // Check in-memory cache first
     if (locationCache[locationKey]) {
         console.log(`[Geocode] Using cached coordinates for "${location}"`);
         return locationCache[locationKey];
@@ -108,6 +144,7 @@ async function geocodeLocation(location) {
                 lat: parseFloat(data[0].lat),
                 lng: parseFloat(data[0].lon)
             };
+            // Save to in-memory cache (localStorage will be saved in batch later)
             locationCache[locationKey] = coords;
             console.log(`[Geocode] Found coordinates for "${location}":`, coords);
             return coords;
@@ -211,15 +248,21 @@ async function displayArtistsOnMap() {
         // Geocode and add markers for each location
         let geocodedCount = 0;
         let processedCount = 0;
+        let newLocationsGeocoded = false;
 
         for (const [locationKey, artists] of Object.entries(artistsByLocation)) {
             processedCount++;
             console.log(`[Map] Processing location ${processedCount}/${totalLocations}: "${artists[0].location}"`);
 
             try {
+                const wasInCache = !!locationCache[locationKey];
                 const coords = await geocodeLocation(artists[0].location);
 
                 if (coords) {
+                    if (!wasInCache) {
+                        newLocationsGeocoded = true;
+                    }
+
                     geocodedCount++;
 
                     // Create custom icon based on explored status
@@ -265,13 +308,19 @@ async function displayArtistsOnMap() {
                 }
 
                 // Add delay to respect Nominatim rate limits (1 request per second)
-                if (processedCount < totalLocations) {
+                // Only add delay if we're not using cached data
+                if (processedCount < totalLocations && !wasInCache) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
             } catch (error) {
                 console.error(`[Map] Error processing location "${artists[0].location}":`, error);
                 // Continue to next location even if this one fails
             }
+        }
+
+        // Save cache once after all geocoding is complete (if we added new locations)
+        if (newLocationsGeocoded) {
+            saveGeocodingCache();
         }
 
         console.log(`[Map] Geocoding complete: ${geocodedCount}/${totalLocations} successful`);
@@ -295,6 +344,21 @@ async function displayArtistsOnMap() {
             console.log('[Map] No markers to display');
         }
 
+        // Ensure map container is visible and properly sized
+        const mapContainer = document.getElementById('map');
+        if (mapContainer) {
+            console.log('[Map] Map container display:', window.getComputedStyle(mapContainer).display);
+            console.log('[Map] Map container visibility:', window.getComputedStyle(mapContainer).visibility);
+        }
+
+        // Final invalidateSize to ensure proper rendering
+        setTimeout(() => {
+            if (map) {
+                map.invalidateSize();
+                console.log('[Map] Final invalidateSize called');
+            }
+        }, 200);
+
         console.log('[Map] displayArtistsOnMap complete');
     } catch (error) {
         console.error('[Map] Fatal error in displayArtistsOnMap:', error);
@@ -303,6 +367,15 @@ async function displayArtistsOnMap() {
         // Always hide loading, even if there's an error
         console.log('[Map] Hiding loading overlay');
         showLoading(false);
+
+        // Double-check that we're still in map view and container is visible
+        if (currentView === 'map') {
+            const mapContainer = document.getElementById('map');
+            if (mapContainer && mapContainer.classList.contains('hidden')) {
+                console.error('[Map] WARNING: Map container became hidden! Removing hidden class...');
+                mapContainer.classList.remove('hidden');
+            }
+        }
     }
 }
 
@@ -397,6 +470,9 @@ function toggleView() {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    // Load geocoding cache from localStorage
+    loadGeocodingCache();
+
     // Register cola extension
     if (typeof cytoscape !== 'undefined' && typeof cola !== 'undefined') {
         cytoscape.use(cytoscapeCola);

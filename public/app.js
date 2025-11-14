@@ -5,6 +5,8 @@ let currentArtistId = null;
 let allArtists = [];
 let currentRating = 0;  // Default to 0 (no rating)
 let artistMarkers = []; // Store map markers
+let selectedGenres = new Set(); // Store selected genre names for filtering
+let allGenres = []; // Store all available genres
 
 // Proper CSV parser that handles quotes, escaping, and newlines
 function parseCSV(csvText) {
@@ -205,6 +207,10 @@ async function displayArtistsOnMap() {
     console.log('[Map] Starting displayArtistsOnMap...');
     console.log('[Map] Total artists:', allArtists.length);
 
+    // Get filtered artists
+    const artistsToDisplay = getFilteredArtists();
+    console.log('[Map] Displaying filtered artists:', artistsToDisplay.length);
+
     try {
         if (!map) {
             console.log('[Map] Initializing map...');
@@ -222,7 +228,7 @@ async function displayArtistsOnMap() {
         const artistsByLocation = {};
         const artistsWithoutLocation = [];
 
-        for (const artist of allArtists) {
+        for (const artist of artistsToDisplay) {
             if (artist.location && artist.location.trim()) {
                 const locationKey = artist.location.toLowerCase().trim();
                 if (!artistsByLocation[locationKey]) {
@@ -449,6 +455,141 @@ window.selectArtistFromMap = function(artistId) {
     }
 };
 
+// Load genres from API
+async function loadGenres() {
+    try {
+        const response = await fetch('/api/genres');
+        const genres = await response.json();
+        allGenres = genres;
+        displayGenreTags();
+    } catch (error) {
+        console.error('Failed to load genres:', error);
+        document.getElementById('genreFilters').innerHTML = '<p class="help-text">No genres available</p>';
+    }
+}
+
+// Display genre tags
+function displayGenreTags() {
+    const container = document.getElementById('genreFilters');
+
+    if (allGenres.length === 0) {
+        container.innerHTML = '<p class="help-text">No genres available</p>';
+        return;
+    }
+
+    // Count how many artists have each genre
+    const genreCounts = {};
+    allGenres.forEach(genre => {
+        genreCounts[genre.name] = allArtists.filter(artist =>
+            artist.genres && artist.genres.some(g => g.name === genre.name)
+        ).length;
+    });
+
+    container.innerHTML = allGenres.map(genre => `
+        <div class="genre-tag ${selectedGenres.has(genre.name) ? 'active' : ''}"
+             data-genre="${genre.name}"
+             onclick="toggleGenreFilter('${genre.name.replace(/'/g, "\\'")}')">
+            ${genre.name}
+            <span class="count">(${genreCounts[genre.name] || 0})</span>
+        </div>
+    `).join('');
+}
+
+// Toggle genre filter
+window.toggleGenreFilter = function(genreName) {
+    if (selectedGenres.has(genreName)) {
+        selectedGenres.delete(genreName);
+    } else {
+        selectedGenres.add(genreName);
+    }
+
+    // Update UI
+    displayGenreTags();
+
+    // Show/hide clear button
+    const clearButton = document.getElementById('clearFilters');
+    if (selectedGenres.size > 0) {
+        clearButton.style.display = 'block';
+    } else {
+        clearButton.style.display = 'none';
+    }
+
+    // Update graph and map with filtered data
+    updateVisualizationsWithFilter();
+};
+
+// Clear all genre filters
+function clearGenreFilters() {
+    selectedGenres.clear();
+    displayGenreTags();
+    document.getElementById('clearFilters').style.display = 'none';
+    updateVisualizationsWithFilter();
+}
+
+// Get filtered artists based on selected genres
+function getFilteredArtists() {
+    if (selectedGenres.size === 0) {
+        return allArtists;
+    }
+
+    return allArtists.filter(artist => {
+        if (!artist.genres || artist.genres.length === 0) {
+            return false;
+        }
+        // Artist must have at least one of the selected genres
+        return artist.genres.some(genre => selectedGenres.has(genre.name));
+    });
+}
+
+// Update visualizations with filtered data
+function updateVisualizationsWithFilter() {
+    console.log('[Filter] Updating visualizations with genre filter:', Array.from(selectedGenres));
+
+    const filteredArtists = getFilteredArtists();
+    console.log(`[Filter] Showing ${filteredArtists.length} of ${allArtists.length} artists`);
+
+    // Update graph
+    updateGraphWithFilteredData(filteredArtists);
+
+    // Update map
+    displayArtistsOnMap();
+}
+
+// Update graph with filtered data
+function updateGraphWithFilteredData(filteredArtists) {
+    // Get IDs of filtered artists
+    const filteredIds = new Set(filteredArtists.map(a => a.id.toString()));
+
+    // Hide/show nodes based on filter
+    cy.nodes().forEach(node => {
+        const nodeId = node.id();
+        if (filteredIds.has(nodeId)) {
+            node.style('display', 'element');
+        } else {
+            node.style('display', 'none');
+        }
+    });
+
+    // Hide edges where either endpoint is hidden
+    cy.edges().forEach(edge => {
+        const source = edge.source();
+        const target = edge.target();
+        if (filteredIds.has(source.id()) && filteredIds.has(target.id())) {
+            edge.style('display', 'element');
+        } else {
+            edge.style('display', 'none');
+        }
+    });
+
+    // Fit to visible nodes
+    setTimeout(() => {
+        const visibleNodes = cy.nodes('[display = "element"]');
+        if (visibleNodes.length > 0) {
+            cy.fit(visibleNodes, 50);
+        }
+    }, 100);
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     // Load geocoding cache from localStorage
@@ -463,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();  // Initialize map on page load
     initEventListeners();
     loadGraphData();  // This will also load map data
+    loadGenres();  // Load genres for filtering
 });
 
 // Initialize Cytoscape graph
@@ -798,6 +940,9 @@ function initEventListeners() {
         displayArtistsOnMap();
     });
 
+    // Clear genre filters
+    document.getElementById('clearFilters').addEventListener('click', clearGenreFilters);
+
     // Node info panel
     document.getElementById('closeNodeInfo').addEventListener('click', hideNodeInfo);
     document.getElementById('editNode').addEventListener('click', editNode);
@@ -1124,6 +1269,9 @@ async function loadGraphData() {
 
         // Update map with new data (don't wait for it, run in parallel)
         displayArtistsOnMap();
+
+        // Reload genres to update counts
+        loadGenres();
 
     } catch (error) {
         showToast('Failed to load graph data: ' + error.message, 'error');

@@ -234,6 +234,12 @@ function getAllArtistsWithGenres() {
   }));
 }
 
+// Get all unique genres
+function getAllGenres() {
+  const stmt = db.prepare('SELECT * FROM genres ORDER BY name');
+  return stmt.all();
+}
+
 module.exports = {
   initDatabase,
   getOrCreateArtist,
@@ -249,5 +255,6 @@ module.exports = {
   addGenreToArtist,
   setArtistGenres,
   getArtistGenres,
-  getAllArtistsWithGenres
+  getAllArtistsWithGenres,
+  getAllGenres
 };

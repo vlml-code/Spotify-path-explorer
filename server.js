@@ -158,6 +158,16 @@ app.delete('/api/artists/:id', (req, res) => {
   }
 });
 
+// Get all genres
+app.get('/api/genres', (req, res) => {
+  try {
+    const genres = db.getAllGenres();
+    res.json(genres);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Serve index.html for root
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

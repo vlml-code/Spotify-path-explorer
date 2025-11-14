@@ -9,6 +9,9 @@
     <script src="https://unpkg.com/webcola@3.4.0/WebCola/cola.min.js"></script>
     <script src="https://unpkg.com/cytoscape-cola@2.5.1/cytoscape-cola.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet for map view -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
     <div class="container">
@@ -108,12 +111,15 @@
         <!-- Main Content -->
         <main class="main-content">
             <div class="graph-header">
-                <h2>Artist Network</h2>
+                <h2 id="viewTitle">Artist Network</h2>
                 <div class="graph-controls">
-                    <button id="fitGraph" class="btn-icon" title="Fit to screen">
+                    <button id="toggleView" class="btn-view" title="Toggle between graph and map view">
+                        <i class="fas fa-globe"></i> Map View
+                    </button>
+                    <button id="fitGraph" class="btn-icon view-graph-only" title="Fit to screen">
                         <i class="fas fa-expand"></i>
                     </button>
-                    <button id="resetGraph" class="btn-icon" title="Reset view">
+                    <button id="resetGraph" class="btn-icon view-graph-only" title="Reset view">
                         <i class="fas fa-sync-alt"></i>
                     </button>
                     <button id="refreshGraph" class="btn-icon" title="Reload data">
@@ -123,7 +129,10 @@
             </div>
 
             <!-- Graph Container -->
-            <div id="cy" class="graph-container"></div>
+            <div id="cy" class="graph-container view-graph"></div>
+
+            <!-- Map Container -->
+            <div id="map" class="map-container view-map hidden"></div>
 
             <!-- Node Info Panel -->
             <div id="nodeInfo" class="node-info hidden">

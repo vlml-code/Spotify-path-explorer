@@ -1,8 +1,11 @@
 // Global state
 let cy = null;
+let map = null;
 let currentArtistId = null;
 let allArtists = [];
 let currentRating = 5;
+let currentView = 'graph'; // 'graph' or 'map'
+let artistMarkers = []; // Store map markers
 
 // Proper CSV parser that handles quotes, escaping, and newlines
 function parseCSV(csvText) {
@@ -56,6 +59,253 @@ function parseCSV(csvText) {
     }
 
     return rows;
+}
+
+// Geocoding cache for common locations
+const locationCache = {};
+
+// Simple geocoding function with fallback
+async function geocodeLocation(location) {
+    if (!location || !location.trim()) return null;
+
+    const locationKey = location.toLowerCase().trim();
+
+    // Check cache first
+    if (locationCache[locationKey]) {
+        return locationCache[locationKey];
+    }
+
+    try {
+        // Use Nominatim (OpenStreetMap) geocoding service
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?` +
+            `q=${encodeURIComponent(location)}&format=json&limit=1`,
+            {
+                headers: {
+                    'User-Agent': 'Artist-Explorer-App'
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+            const coords = {
+                lat: parseFloat(data[0].lat),
+                lng: parseFloat(data[0].lon)
+            };
+            locationCache[locationKey] = coords;
+            return coords;
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+    }
+
+    return null;
+}
+
+// Initialize Leaflet map
+function initMap() {
+    if (!map) {
+        map = L.map('map', {
+            center: [20, 0],
+            zoom: 2,
+            minZoom: 2,
+            maxZoom: 18,
+            worldCopyJump: true
+        });
+
+        // Add dark theme tile layer
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+    }
+}
+
+// Display artists on the map
+async function displayArtistsOnMap() {
+    if (!map) {
+        initMap();
+    }
+
+    // Clear existing markers
+    artistMarkers.forEach(marker => map.removeLayer(marker));
+    artistMarkers = [];
+
+    showLoading(true);
+
+    // Group artists by location to handle multiple artists in same city
+    const artistsByLocation = {};
+    const artistsWithoutLocation = [];
+
+    for (const artist of allArtists) {
+        if (artist.location && artist.location.trim()) {
+            const locationKey = artist.location.toLowerCase().trim();
+            if (!artistsByLocation[locationKey]) {
+                artistsByLocation[locationKey] = [];
+            }
+            artistsByLocation[locationKey].push(artist);
+        } else {
+            artistsWithoutLocation.push(artist);
+        }
+    }
+
+    // Geocode and add markers for each location
+    let geocodedCount = 0;
+    const totalLocations = Object.keys(artistsByLocation).length;
+
+    for (const [locationKey, artists] of Object.entries(artistsByLocation)) {
+        const coords = await geocodeLocation(artists[0].location);
+
+        if (coords) {
+            geocodedCount++;
+
+            // Create custom icon based on explored status
+            const iconColor = artists.some(a => a.explored === 1) ? '#1db954' : '#e67e22';
+            const iconHtml = `
+                <div style="
+                    background-color: ${iconColor};
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    border: 3px solid #fff;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-weight: bold;
+                    font-size: 12px;
+                ">
+                    ${artists.length > 1 ? artists.length : '♪'}
+                </div>
+            `;
+
+            const customIcon = L.divIcon({
+                html: iconHtml,
+                className: 'custom-artist-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15]
+            });
+
+            // Create popup content
+            const popupContent = artists.length === 1 ?
+                createSingleArtistPopup(artists[0]) :
+                createMultiArtistPopup(artists);
+
+            const marker = L.marker([coords.lat, coords.lng], { icon: customIcon })
+                .bindPopup(popupContent)
+                .addTo(map);
+
+            artistMarkers.push(marker);
+        }
+
+        // Add delay to respect Nominatim rate limits (1 request per second)
+        if (geocodedCount < totalLocations) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+
+    showLoading(false);
+
+    if (artistsWithoutLocation.length > 0) {
+        showToast(`${artistsWithoutLocation.length} artist(s) without location data`, 'warning');
+    }
+
+    if (geocodedCount === 0 && totalLocations > 0) {
+        showToast('Could not geocode any locations', 'error');
+    }
+
+    // Fit map to show all markers
+    if (artistMarkers.length > 0) {
+        const group = L.featureGroup(artistMarkers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+}
+
+// Create popup for single artist
+function createSingleArtistPopup(artist) {
+    return `
+        <div class="artist-popup">
+            <h4>${artist.name}</h4>
+            <p><i class="fas fa-map-marker-alt"></i> ${artist.location || 'Unknown'}</p>
+            <p class="rating"><i class="fas fa-star"></i> ${artist.rating || 5}/10</p>
+            <p class="${artist.explored === 1 ? 'explored' : 'unexplored'}">
+                <i class="fas fa-${artist.explored === 1 ? 'check-circle' : 'circle'}"></i>
+                ${artist.explored === 1 ? 'Explored' : 'Not explored'}
+            </p>
+        </div>
+    `;
+}
+
+// Create popup for multiple artists at same location
+function createMultiArtistPopup(artists) {
+    const artistList = artists.map(artist => `
+        <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #333;">
+            <strong>${artist.name}</strong><br>
+            <span class="rating"><i class="fas fa-star"></i> ${artist.rating || 5}/10</span> -
+            <span class="${artist.explored === 1 ? 'explored' : 'unexplored'}">
+                ${artist.explored === 1 ? 'Explored' : 'Not explored'}
+            </span>
+        </div>
+    `).join('');
+
+    return `
+        <div class="artist-popup">
+            <h4>${artists[0].location}</h4>
+            <p style="margin-bottom: 12px;"><i class="fas fa-users"></i> ${artists.length} artists</p>
+            ${artistList}
+        </div>
+    `;
+}
+
+// Toggle between graph and map views
+function toggleView() {
+    const graphContainer = document.getElementById('cy');
+    const mapContainer = document.getElementById('map');
+    const toggleBtn = document.getElementById('toggleView');
+    const viewTitle = document.getElementById('viewTitle');
+    const graphOnlyButtons = document.querySelectorAll('.view-graph-only');
+
+    if (currentView === 'graph') {
+        // Switch to map view
+        currentView = 'map';
+        graphContainer.classList.add('hidden');
+        mapContainer.classList.remove('hidden');
+        toggleBtn.innerHTML = '<i class="fas fa-project-diagram"></i> Graph View';
+        viewTitle.textContent = 'Artist Map';
+        graphOnlyButtons.forEach(btn => btn.classList.add('hidden'));
+
+        // Initialize and display map
+        if (!map) {
+            initMap();
+        }
+
+        // Invalidate size to fix display issues
+        setTimeout(() => {
+            map.invalidateSize();
+            displayArtistsOnMap();
+        }, 100);
+    } else {
+        // Switch to graph view
+        currentView = 'graph';
+        graphContainer.classList.remove('hidden');
+        mapContainer.classList.add('hidden');
+        toggleBtn.innerHTML = '<i class="fas fa-globe"></i> Map View';
+        viewTitle.textContent = 'Artist Network';
+        graphOnlyButtons.forEach(btn => btn.classList.remove('hidden'));
+
+        // Refresh graph layout
+        setTimeout(() => {
+            if (cy) {
+                cy.resize();
+                cy.fit(null, 50);
+            }
+        }, 100);
+    }
 }
 
 // Initialize app
@@ -393,7 +643,16 @@ function initEventListeners() {
         cy.center();
     });
 
-    document.getElementById('refreshGraph').addEventListener('click', loadGraphData);
+    document.getElementById('refreshGraph').addEventListener('click', () => {
+        if (currentView === 'map') {
+            displayArtistsOnMap();
+        } else {
+            loadGraphData();
+        }
+    });
+
+    // Toggle view button
+    document.getElementById('toggleView').addEventListener('click', toggleView);
 
     // Node info panel
     document.getElementById('closeNodeInfo').addEventListener('click', hideNodeInfo);

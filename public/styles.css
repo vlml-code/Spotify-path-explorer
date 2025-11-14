@@ -326,10 +326,25 @@ body {
     display: flex;
     flex-direction: column;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
-.graph-header {
+/* View Sections */
+.view-section {
+    min-height: 500px;
+    height: 600px;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 2px solid var(--border);
+    flex-shrink: 0;
+}
+
+.view-section:last-of-type {
+    border-bottom: none;
+}
+
+.section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -338,7 +353,7 @@ body {
     border-bottom: 1px solid var(--border);
 }
 
-.graph-header h2 {
+.section-header h2 {
     font-size: 1.5rem;
 }
 
@@ -577,38 +592,6 @@ body {
     background: var(--bg-dark);
     position: relative;
     z-index: 0;
-}
-
-.map-container.hidden {
-    display: none;
-}
-
-.btn-view {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
-    padding: 0.6rem 1.2rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
-}
-
-.btn-view:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(29, 185, 84, 0.4);
-}
-
-.view-graph-only {
-    display: flex;
-}
-
-.view-graph-only.hidden {
-    display: none;
 }
 
 /* Custom Leaflet popup styling */

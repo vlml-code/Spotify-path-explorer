@@ -4,7 +4,6 @@ let map = null;
 let currentArtistId = null;
 let allArtists = [];
 let currentRating = 5;
-let currentView = 'graph'; // 'graph' or 'map'
 let artistMarkers = []; // Store map markers
 
 // Proper CSV parser that handles quotes, escaping, and newlines
@@ -344,13 +343,6 @@ async function displayArtistsOnMap() {
             console.log('[Map] No markers to display');
         }
 
-        // Ensure map container is visible and properly sized
-        const mapContainer = document.getElementById('map');
-        if (mapContainer) {
-            console.log('[Map] Map container display:', window.getComputedStyle(mapContainer).display);
-            console.log('[Map] Map container visibility:', window.getComputedStyle(mapContainer).visibility);
-        }
-
         // Final invalidateSize to ensure proper rendering
         setTimeout(() => {
             if (map) {
@@ -367,15 +359,6 @@ async function displayArtistsOnMap() {
         // Always hide loading, even if there's an error
         console.log('[Map] Hiding loading overlay');
         showLoading(false);
-
-        // Double-check that we're still in map view and container is visible
-        if (currentView === 'map') {
-            const mapContainer = document.getElementById('map');
-            if (mapContainer && mapContainer.classList.contains('hidden')) {
-                console.error('[Map] WARNING: Map container became hidden! Removing hidden class...');
-                mapContainer.classList.remove('hidden');
-            }
-        }
     }
 }
 
@@ -415,59 +398,6 @@ function createMultiArtistPopup(artists) {
     `;
 }
 
-// Toggle between graph and map views
-function toggleView() {
-    console.log('[View] toggleView called, current view:', currentView);
-    const graphContainer = document.getElementById('cy');
-    const mapContainer = document.getElementById('map');
-    const toggleBtn = document.getElementById('toggleView');
-    const viewTitle = document.getElementById('viewTitle');
-    const graphOnlyButtons = document.querySelectorAll('.view-graph-only');
-
-    if (currentView === 'graph') {
-        // Switch to map view
-        console.log('[View] Switching to map view...');
-        currentView = 'map';
-        graphContainer.classList.add('hidden');
-        mapContainer.classList.remove('hidden');
-        toggleBtn.innerHTML = '<i class="fas fa-project-diagram"></i> Graph View';
-        viewTitle.textContent = 'Artist Map';
-        graphOnlyButtons.forEach(btn => btn.classList.add('hidden'));
-
-        // Initialize and display map
-        if (!map) {
-            console.log('[View] Map not initialized, initializing now...');
-            initMap();
-        } else {
-            console.log('[View] Map already initialized');
-        }
-
-        // Invalidate size to fix display issues
-        setTimeout(() => {
-            console.log('[View] Invalidating map size and displaying artists...');
-            map.invalidateSize();
-            displayArtistsOnMap();
-        }, 100);
-    } else {
-        // Switch to graph view
-        console.log('[View] Switching to graph view...');
-        currentView = 'graph';
-        graphContainer.classList.remove('hidden');
-        mapContainer.classList.add('hidden');
-        toggleBtn.innerHTML = '<i class="fas fa-globe"></i> Map View';
-        viewTitle.textContent = 'Artist Network';
-        graphOnlyButtons.forEach(btn => btn.classList.remove('hidden'));
-
-        // Refresh graph layout
-        setTimeout(() => {
-            if (cy) {
-                cy.resize();
-                cy.fit(null, 50);
-            }
-        }, 100);
-    }
-}
-
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     // Load geocoding cache from localStorage
@@ -479,8 +409,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initGraph();
+    initMap();  // Initialize map on page load
     initEventListeners();
-    loadGraphData();
+    loadGraphData();  // This will also load map data
 });
 
 // Initialize Cytoscape graph
@@ -806,16 +737,15 @@ function initEventListeners() {
         cy.center();
     });
 
-    document.getElementById('refreshGraph').addEventListener('click', () => {
-        if (currentView === 'map') {
-            displayArtistsOnMap();
-        } else {
-            loadGraphData();
-        }
+    // Refresh both graph and map data
+    document.getElementById('refreshData').addEventListener('click', () => {
+        loadGraphData();  // This will trigger map update too
     });
 
-    // Toggle view button
-    document.getElementById('toggleView').addEventListener('click', toggleView);
+    // Refresh just the map
+    document.getElementById('refreshMap').addEventListener('click', () => {
+        displayArtistsOnMap();
+    });
 
     // Node info panel
     document.getElementById('closeNodeInfo').addEventListener('click', hideNodeInfo);
@@ -1129,6 +1059,9 @@ async function loadGraphData() {
         setTimeout(() => {
             cy.fit(null, 50);
         }, 1100);
+
+        // Update map with new data (don't wait for it, run in parallel)
+        displayArtistsOnMap();
 
     } catch (error) {
         showToast('Failed to load graph data: ' + error.message, 'error');

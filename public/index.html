@@ -110,29 +110,37 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <div class="graph-header">
-                <h2 id="viewTitle">Artist Network</h2>
-                <div class="graph-controls">
-                    <button id="toggleView" class="btn-view" title="Toggle between graph and map view">
-                        <i class="fas fa-globe"></i> Map View
-                    </button>
-                    <button id="fitGraph" class="btn-icon view-graph-only" title="Fit to screen">
-                        <i class="fas fa-expand"></i>
-                    </button>
-                    <button id="resetGraph" class="btn-icon view-graph-only" title="Reset view">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="refreshGraph" class="btn-icon" title="Reload data">
-                        <i class="fas fa-redo"></i>
-                    </button>
+            <!-- Graph Section -->
+            <section class="view-section">
+                <div class="section-header">
+                    <h2>Artist Network</h2>
+                    <div class="graph-controls">
+                        <button id="fitGraph" class="btn-icon" title="Fit to screen">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                        <button id="resetGraph" class="btn-icon" title="Reset view">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button id="refreshData" class="btn-icon" title="Reload data">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
                 </div>
-            </div>
+                <div id="cy" class="graph-container"></div>
+            </section>
 
-            <!-- Graph Container -->
-            <div id="cy" class="graph-container view-graph"></div>
-
-            <!-- Map Container -->
-            <div id="map" class="map-container view-map hidden"></div>
+            <!-- Map Section -->
+            <section class="view-section">
+                <div class="section-header">
+                    <h2>Artist Map</h2>
+                    <div class="graph-controls">
+                        <button id="refreshMap" class="btn-icon" title="Refresh map">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="map" class="map-container"></div>
+            </section>
 
             <!-- Node Info Panel -->
             <div id="nodeInfo" class="node-info hidden">

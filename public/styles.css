@@ -489,6 +489,33 @@ body {
     width: 20px;
 }
 
+.node-connections {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.node-connections p {
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.connected-artists-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.connected-artist {
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--text-secondary);
+    border-radius: 15px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
 .node-genres {
     margin-top: 0.75rem;
     padding-top: 0.75rem;

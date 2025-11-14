@@ -1293,9 +1293,28 @@ function showNodeInfo(nodeData) {
     document.getElementById('nodeRating').textContent = artist.rating || 0;
     document.getElementById('nodeExplored').textContent = artist.explored ? 'Explored ✓' : 'Not explored yet';
 
-    // Count connections
-    const connections = cy.getElementById(nodeData.id).connectedEdges().length;
-    document.getElementById('nodeConnections').textContent = connections;
+    // Display connected artists
+    const node = cy.getElementById(nodeData.id);
+    const connectedNodes = node.connectedEdges().connectedNodes().filter(n => n.id() !== nodeData.id);
+    const connectionsContainer = document.getElementById('nodeConnections');
+
+    if (connectedNodes.length > 0) {
+        const connectedArtists = connectedNodes.map(n => {
+            const connectedArtist = allArtists.find(a => a.id === parseInt(n.id()));
+            return connectedArtist ? connectedArtist.name : n.data('label');
+        }).sort();
+
+        const artistLinks = connectedArtists.map(name =>
+            `<span class="connected-artist">${name}</span>`
+        ).join('');
+
+        connectionsContainer.innerHTML = `
+            <p><i class="fas fa-link"></i> Connected to (${connectedNodes.length}):</p>
+            <div class="connected-artists-list">${artistLinks}</div>
+        `;
+    } else {
+        connectionsContainer.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem;"><i class="fas fa-link"></i> No connections</p>';
+    }
 
     // Display genres
     const genresContainer = document.getElementById('nodeGenres');

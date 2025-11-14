@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artist Explorer - Interactive Graph</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/webcola@3.4.0/WebCola/cola.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-cola@2.5.1/cytoscape-cola.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-music"></i> Artist Explorer</h1>
+                <p class="subtitle">Discover the connections</p>
+            </div>
+
+            <!-- Artist Form -->
+            <div class="form-container">
+                <h2>Add/Update Artist</h2>
+
+                <div class="form-group">
+                    <label for="artistName">
+                        <i class="fas fa-user"></i> Artist Name
+                    </label>
+                    <input type="text" id="artistName" placeholder="Enter artist name..." autocomplete="off">
+                    <div id="artistSuggestions" class="suggestions"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="location">
+                        <i class="fas fa-map-marker-alt"></i> Location
+                    </label>
+                    <input type="text" id="location" placeholder="City, Country">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-star"></i> Rating
+                    </label>
+                    <div class="rating-container">
+                        <div class="stars" id="ratingStars">
+                            <i class="far fa-star" data-rating="1"></i>
+                            <i class="far fa-star" data-rating="2"></i>
+                            <i class="far fa-star" data-rating="3"></i>
+                            <i class="far fa-star" data-rating="4"></i>
+                            <i class="far fa-star" data-rating="5"></i>
+                            <i class="far fa-star" data-rating="6"></i>
+                            <i class="far fa-star" data-rating="7"></i>
+                            <i class="far fa-star" data-rating="8"></i>
+                            <i class="far fa-star" data-rating="9"></i>
+                            <i class="far fa-star" data-rating="10"></i>
+                        </div>
+                        <span class="rating-value" id="ratingValue">5</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="explored">
+                        <span class="checkbox-custom"></span>
+                        <span><i class="fas fa-check-circle"></i> Explored</span>
+                    </label>
+                </div>
+
+                <button id="saveArtist" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Artist
+                </button>
+
+                <!-- Related Artists Section -->
+                <div class="related-section">
+                    <h3>Add Related Artists</h3>
+                    <p class="help-text">CSV format: name, location (supports quotes and escaping)</p>
+
+                    <div class="form-group">
+                        <textarea id="relatedArtistsCSV" placeholder="Example:&#10;Taylor Swift, USA&#10;Ed Sheeran, UK&#10;&quot;AC/DC&quot;, Australia&#10;&quot;John &quot;&quot;The Boss&quot;&quot; Smith&quot;, &quot;New York, USA&quot;" rows="6"></textarea>
+                    </div>
+
+                    <button id="addRelated" class="btn btn-secondary">
+                        <i class="fas fa-link"></i> Add Related Artists
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats">
+                <div class="stat-item">
+                    <i class="fas fa-users"></i>
+                    <div>
+                        <span class="stat-value" id="totalArtists">0</span>
+                        <span class="stat-label">Artists</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-project-diagram"></i>
+                    <div>
+                        <span class="stat-value" id="totalConnections">0</span>
+                        <span class="stat-label">Connections</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="graph-header">
+                <h2>Artist Network</h2>
+                <div class="graph-controls">
+                    <button id="fitGraph" class="btn-icon" title="Fit to screen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button id="resetGraph" class="btn-icon" title="Reset view">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button id="refreshGraph" class="btn-icon" title="Reload data">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Graph Container -->
+            <div id="cy" class="graph-container"></div>
+
+            <!-- Node Info Panel -->
+            <div id="nodeInfo" class="node-info hidden">
+                <button class="close-btn" id="closeNodeInfo"><i class="fas fa-times"></i></button>
+                <h3 id="nodeArtistName"></h3>
+                <div class="node-details">
+                    <p><i class="fas fa-map-marker-alt"></i> <span id="nodeLocation">-</span></p>
+                    <p><i class="fas fa-star"></i> Rating: <span id="nodeRating">-</span>/10</p>
+                    <p><i class="fas fa-check-circle"></i> <span id="nodeExplored">Not explored</span></p>
+                    <p><i class="fas fa-link"></i> Connections: <span id="nodeConnections">0</span></p>
+                </div>
+                <div class="node-actions">
+                    <button id="editNode" class="btn btn-small">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button id="deleteNode" class="btn btn-small btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Overlay -->
+            <div id="loadingOverlay" class="loading-overlay hidden">
+                <div class="spinner"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -17,6 +17,10 @@ A modern, animated web application for exploring relationships between artists. 
 - **Responsive Design**: Modern, dark-themed UI with smooth animations
 - **Real-time Stats**: Track total artists and connections
 
+## Requirements
+
+- Node.js v22.5.0 or later (uses built-in SQLite module)
+
 ## Installation
 
 1. Install dependencies:
@@ -103,7 +107,7 @@ Location is optional. Each line represents one artist.
 
 ## Database
 
-The app uses SQLite with the following schema:
+The app uses Node.js's built-in SQLite module (available in Node.js v22.5.0+) with the following schema:
 
 - **artists**: id, name, location, rating, explored, created_at
 - **relationships**: id, artist_id, related_artist_id, created_at
@@ -112,10 +116,10 @@ Database file: `artists.db` (auto-created on first run)
 
 ## Tech Stack
 
-- **Backend**: Node.js, Express, better-sqlite3
+- **Backend**: Node.js (v22.5.0+), Express, Built-in SQLite module
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
 - **Graph**: Cytoscape.js
-- **Database**: SQLite
+- **Database**: SQLite (via Node.js built-in module - no native compilation required!)
 
 ## API Endpoints
 

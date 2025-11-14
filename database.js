@@ -1,7 +1,7 @@
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'artists.db'));
+const db = new DatabaseSync(path.join(__dirname, 'artists.db'));
 
 // Initialize database schema
 function initDatabase() {
@@ -35,14 +35,18 @@ function initDatabase() {
 
 // Get or create artist
 function getOrCreateArtist(name, location = null) {
-  const existing = db.prepare('SELECT * FROM artists WHERE name = ?').get(name);
+  const stmt = db.prepare('SELECT * FROM artists WHERE name = ?');
+  const existing = stmt.get(name);
 
   if (existing) {
     return existing;
   }
 
-  const result = db.prepare('INSERT INTO artists (name, location) VALUES (?, ?)').run(name, location);
-  return db.prepare('SELECT * FROM artists WHERE id = ?').get(result.lastInsertRowid);
+  const insertStmt = db.prepare('INSERT INTO artists (name, location) VALUES (?, ?)');
+  const result = insertStmt.run(name, location);
+
+  const selectStmt = db.prepare('SELECT * FROM artists WHERE id = ?');
+  return selectStmt.get(result.lastInsertRowid);
 }
 
 // Update artist
@@ -66,18 +70,21 @@ function updateArtist(id, data) {
 
   if (updates.length > 0) {
     values.push(id);
-    db.prepare(`UPDATE artists SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    const stmt = db.prepare(`UPDATE artists SET ${updates.join(', ')} WHERE id = ?`);
+    stmt.run(...values);
   }
 
-  return db.prepare('SELECT * FROM artists WHERE id = ?').get(id);
+  const selectStmt = db.prepare('SELECT * FROM artists WHERE id = ?');
+  return selectStmt.get(id);
 }
 
 // Add relationship (bidirectional)
 function addRelationship(artistId, relatedArtistId) {
   try {
+    const stmt = db.prepare('INSERT OR IGNORE INTO relationships (artist_id, related_artist_id) VALUES (?, ?)');
     // Add relationship in both directions
-    db.prepare('INSERT OR IGNORE INTO relationships (artist_id, related_artist_id) VALUES (?, ?)').run(artistId, relatedArtistId);
-    db.prepare('INSERT OR IGNORE INTO relationships (artist_id, related_artist_id) VALUES (?, ?)').run(relatedArtistId, artistId);
+    stmt.run(artistId, relatedArtistId);
+    stmt.run(relatedArtistId, artistId);
     return true;
   } catch (error) {
     console.error('Error adding relationship:', error);
@@ -87,44 +94,52 @@ function addRelationship(artistId, relatedArtistId) {
 
 // Get all artists
 function getAllArtists() {
-  return db.prepare('SELECT * FROM artists ORDER BY created_at DESC').all();
+  const stmt = db.prepare('SELECT * FROM artists ORDER BY created_at DESC');
+  return stmt.all();
 }
 
 // Get artist by ID
 function getArtistById(id) {
-  return db.prepare('SELECT * FROM artists WHERE id = ?').get(id);
+  const stmt = db.prepare('SELECT * FROM artists WHERE id = ?');
+  return stmt.get(id);
 }
 
 // Get artist by name
 function getArtistByName(name) {
-  return db.prepare('SELECT * FROM artists WHERE name = ?').get(name);
+  const stmt = db.prepare('SELECT * FROM artists WHERE name = ?');
+  return stmt.get(name);
 }
 
 // Get graph data (all artists and relationships)
 function getGraphData() {
   const artists = getAllArtists();
-  const relationships = db.prepare(`
+  const stmt = db.prepare(`
     SELECT DISTINCT r.artist_id, r.related_artist_id
     FROM relationships r
     ORDER BY r.artist_id, r.related_artist_id
-  `).all();
+  `);
+  const relationships = stmt.all();
 
   return { artists, relationships };
 }
 
 // Get related artists for a specific artist
 function getRelatedArtists(artistId) {
-  return db.prepare(`
+  const stmt = db.prepare(`
     SELECT a.* FROM artists a
     INNER JOIN relationships r ON a.id = r.related_artist_id
     WHERE r.artist_id = ?
-  `).all(artistId);
+  `);
+  return stmt.all(artistId);
 }
 
 // Delete artist and all relationships
 function deleteArtist(id) {
-  db.prepare('DELETE FROM relationships WHERE artist_id = ? OR related_artist_id = ?').run(id, id);
-  db.prepare('DELETE FROM artists WHERE id = ?').run(id);
+  const stmt1 = db.prepare('DELETE FROM relationships WHERE artist_id = ? OR related_artist_id = ?');
+  stmt1.run(id, id);
+
+  const stmt2 = db.prepare('DELETE FROM artists WHERE id = ?');
+  stmt2.run(id);
 }
 
 module.exports = {

@@ -1290,12 +1290,26 @@ function showNodeInfo(nodeData) {
 
     document.getElementById('nodeArtistName').textContent = artist.name;
     document.getElementById('nodeLocation').textContent = artist.location || 'Unknown';
-    document.getElementById('nodeRating').textContent = artist.rating || 5;
+    document.getElementById('nodeRating').textContent = artist.rating || 0;
     document.getElementById('nodeExplored').textContent = artist.explored ? 'Explored ✓' : 'Not explored yet';
 
     // Count connections
     const connections = cy.getElementById(nodeData.id).connectedEdges().length;
     document.getElementById('nodeConnections').textContent = connections;
+
+    // Display genres
+    const genresContainer = document.getElementById('nodeGenres');
+    if (artist.genres && artist.genres.length > 0) {
+        const genreTags = artist.genres.map(genre =>
+            `<span class="genre-tag">${genre.name}</span>`
+        ).join('');
+        genresContainer.innerHTML = `
+            <p><i class="fas fa-music"></i> Genres:</p>
+            <div class="genre-tags">${genreTags}</div>
+        `;
+    } else {
+        genresContainer.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;"><i class="fas fa-music"></i> No genres</p>';
+    }
 
     panel.classList.remove('hidden');
     panel.dataset.artistId = artistId;

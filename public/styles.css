@@ -489,6 +489,33 @@ body {
     width: 20px;
 }
 
+.node-genres {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.node-genres p {
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.node-genres .genre-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.node-genres .genre-tag {
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--primary);
+    border-radius: 15px;
+    color: var(--primary);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
 .node-actions {
     display: flex;
     gap: 0.5rem;

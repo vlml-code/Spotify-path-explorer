@@ -1,1 +1,149 @@
-# Spotify-path-explorer
+# Artist Path Explorer
+
+A modern, animated web application for exploring relationships between artists. Built with Node.js, Express, SQLite, and Cytoscape.js for interactive graph visualization.
+
+## Features
+
+- **Interactive Graph Visualization**: Beautiful, animated network graph showing artist relationships
+- **Artist Management**: Add, edit, and rate artists (1-10 stars)
+- **Relationship Tracking**: Connect artists and visualize their network
+- **CSV Import**: Bulk import related artists using CSV format
+- **Smart Duplicate Handling**: Automatically prevents duplicate artists
+- **Color Coding**:
+  - Green nodes: Explored artists
+  - Orange nodes: Unexplored artists
+  - Gold border: High-rated artists (8-10)
+  - Green border: Medium-rated artists (6-7)
+- **Responsive Design**: Modern, dark-themed UI with smooth animations
+- **Real-time Stats**: Track total artists and connections
+
+## Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Start the server:
+```bash
+npm start
+```
+
+3. Open your browser and navigate to:
+```
+http://localhost:3000
+```
+
+## Usage
+
+### Adding an Artist
+
+1. Enter the artist name in the form
+2. Optionally add location
+3. Set rating (1-10 stars)
+4. Check "Explored" if you've already explored this artist
+5. Click "Save Artist"
+
+### Adding Related Artists
+
+1. First, save an artist (this becomes the current artist)
+2. In the "Add Related Artists" section, enter CSV data:
+   ```
+   Taylor Swift, USA
+   Ed Sheeran, UK
+   Adele, UK
+   ```
+3. Click "Add Related Artists"
+4. The app will:
+   - Create new artists if they don't exist
+   - Avoid duplicates
+   - Create bidirectional relationships
+
+### Interacting with the Graph
+
+- **Click** on a node to view artist details
+- **Hover** over nodes to highlight connections
+- **Drag** nodes to reposition them
+- **Scroll** to zoom in/out
+- **Pan** by dragging the background
+- Use the controls to:
+  - Fit graph to screen
+  - Reset view
+  - Refresh data
+
+### Editing Artists
+
+1. Click on a node in the graph
+2. Click "Edit" in the info panel
+3. Update the form
+4. Click "Save Artist"
+
+### Deleting Artists
+
+1. Click on a node in the graph
+2. Click "Delete" in the info panel
+3. Confirm deletion
+4. Artist and all relationships will be removed
+
+## CSV Format
+
+The CSV format for adding related artists is:
+```
+artist_name, location
+```
+
+Example:
+```
+The Beatles, UK
+Pink Floyd, UK
+Led Zeppelin, UK
+```
+
+Location is optional. Each line represents one artist.
+
+## Database
+
+The app uses SQLite with the following schema:
+
+- **artists**: id, name, location, rating, explored, created_at
+- **relationships**: id, artist_id, related_artist_id, created_at
+
+Database file: `artists.db` (auto-created on first run)
+
+## Tech Stack
+
+- **Backend**: Node.js, Express, better-sqlite3
+- **Frontend**: Vanilla JavaScript, HTML5, CSS3
+- **Graph**: Cytoscape.js
+- **Database**: SQLite
+
+## API Endpoints
+
+- `GET /api/artists` - Get all artists
+- `GET /api/graph` - Get graph data (artists + relationships)
+- `GET /api/artists/:id` - Get artist by ID
+- `POST /api/artists` - Create or update artist
+- `PUT /api/artists/:id` - Update artist
+- `POST /api/artists/:id/related` - Add related artists
+- `GET /api/artists/:id/related` - Get related artists
+- `DELETE /api/artists/:id` - Delete artist
+
+## Color Scheme
+
+- **Primary**: #1db954 (Green)
+- **Explored**: #1db954 (Green)
+- **Unexplored**: #e67e22 (Orange)
+- **High Rating**: #ffd700 (Gold border)
+- **Background**: Dark theme with gradients
+
+## Browser Support
+
+Modern browsers with ES6+ support:
+- Chrome 60+
+- Firefox 60+
+- Safari 12+
+- Edge 79+
+
+## License
+
+ISC

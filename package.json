@@ -1,0 +1,18 @@
+{
+  "name": "spotify-path-explorer",
+  "version": "1.0.0",
+  "description": "Artist relationship explorer with graph visualization",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["artist", "graph", "explorer"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "better-sqlite3": "^9.2.2",
+    "body-parser": "^1.20.2"
+  }
+}

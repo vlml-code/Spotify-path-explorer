@@ -1301,17 +1301,28 @@ function showNodeInfo(nodeData) {
     if (connectedNodes.length > 0) {
         const connectedArtists = connectedNodes.map(n => {
             const connectedArtist = allArtists.find(a => a.id === parseInt(n.id()));
-            return connectedArtist ? connectedArtist.name : n.data('label');
-        }).sort();
+            return {
+                id: n.id(),
+                name: connectedArtist ? connectedArtist.name : n.data('label')
+            };
+        }).sort((a, b) => a.name.localeCompare(b.name));
 
-        const artistLinks = connectedArtists.map(name =>
-            `<span class="connected-artist">${name}</span>`
+        const artistLinks = connectedArtists.map(artist =>
+            `<span class="connected-artist" data-artist-id="${artist.id}">${artist.name}</span>`
         ).join('');
 
         connectionsContainer.innerHTML = `
             <p><i class="fas fa-link"></i> Connected to (${connectedNodes.length}):</p>
             <div class="connected-artists-list">${artistLinks}</div>
         `;
+
+        // Add click handlers to connected artist tags
+        connectionsContainer.querySelectorAll('.connected-artist').forEach(tag => {
+            tag.addEventListener('click', () => {
+                const artistId = tag.dataset.artistId;
+                selectArtistFromMap(parseInt(artistId));
+            });
+        });
     } else {
         connectionsContainer.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem;"><i class="fas fa-link"></i> No connections</p>';
     }

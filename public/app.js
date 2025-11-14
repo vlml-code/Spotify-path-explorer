@@ -210,57 +210,101 @@ function initGraph() {
     // Drag physics - make connected nodes follow with gravity
     let draggedNode = null;
     let connectedNodes = null;
+    let prevDragPos = null;
     let animationId = null;
-    const springStrength = 0.15; // How strong the pull is
-    const damping = 0.75; // Reduces oscillation
+    const followStrength = 0.3; // How much connected nodes follow (0-1)
+    const idealDistance = 100; // Ideal edge length
+    const repulsionStrength = 50; // Repulsion between connected nodes
 
     cy.on('grab', 'node', function(evt) {
         draggedNode = evt.target;
+        const dragPos = draggedNode.position();
+        prevDragPos = { x: dragPos.x, y: dragPos.y };
 
         // Get all connected nodes (direct neighbors)
         connectedNodes = draggedNode.connectedEdges().connectedNodes().filter(n => n.id() !== draggedNode.id());
 
-        // Store initial positions and velocities
+        // Store initial data for each connected node
         connectedNodes.forEach(node => {
+            const pos = node.position();
             node.scratch('_velocity', { x: 0, y: 0 });
             node.scratch('_dragging', true);
+            // Store original distance and angle from dragged node
+            const dx = pos.x - dragPos.x;
+            const dy = pos.y - dragPos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            node.scratch('_originalDist', dist);
+            node.scratch('_angle', Math.atan2(dy, dx));
         });
     });
 
     cy.on('drag', 'node', function(evt) {
-        if (!draggedNode || !connectedNodes) return;
+        if (!draggedNode || !connectedNodes || !prevDragPos) return;
 
         const dragPos = draggedNode.position();
 
-        // Apply spring force to connected nodes
+        // Calculate how much the dragged node moved
+        const deltaX = dragPos.x - prevDragPos.x;
+        const deltaY = dragPos.y - prevDragPos.y;
+
+        // Apply movement and forces to connected nodes
         connectedNodes.forEach(node => {
             const pos = node.position();
             const velocity = node.scratch('_velocity') || { x: 0, y: 0 };
+            const originalDist = node.scratch('_originalDist') || idealDistance;
+            const angle = node.scratch('_angle') || 0;
 
-            // Calculate spring force (Hooke's law)
-            const dx = dragPos.x - pos.x;
-            const dy = dragPos.y - pos.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+            // 1. Follow the drag with a fraction of the movement
+            velocity.x += deltaX * followStrength;
+            velocity.y += deltaY * followStrength;
 
-            if (distance > 0) {
-                // Spring force proportional to distance
-                const force = distance * springStrength;
-                const fx = (dx / distance) * force;
-                const fy = (dy / distance) * force;
+            // 2. Maintain ideal distance from dragged node
+            const dx = pos.x - dragPos.x;
+            const dy = pos.y - dragPos.y;
+            const currentDist = Math.sqrt(dx * dx + dy * dy);
 
-                // Update velocity with damping
-                velocity.x = (velocity.x + fx) * damping;
-                velocity.y = (velocity.y + fy) * damping;
+            if (currentDist > 0) {
+                // Spring force to maintain distance
+                const distanceError = currentDist - originalDist;
+                const springForce = -distanceError * 0.1;
+                const forceX = (dx / currentDist) * springForce;
+                const forceY = (dy / currentDist) * springForce;
 
-                // Update position
-                node.position({
-                    x: pos.x + velocity.x,
-                    y: pos.y + velocity.y
-                });
-
-                node.scratch('_velocity', velocity);
+                velocity.x += forceX;
+                velocity.y += forceY;
             }
+
+            // 3. Add repulsion between connected nodes to prevent overlap
+            connectedNodes.forEach(otherNode => {
+                if (otherNode.id() === node.id()) return;
+
+                const otherPos = otherNode.position();
+                const dx2 = pos.x - otherPos.x;
+                const dy2 = pos.y - otherPos.y;
+                const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+                if (dist2 > 0 && dist2 < idealDistance) {
+                    const repulsion = repulsionStrength / (dist2 * dist2);
+                    velocity.x += (dx2 / dist2) * repulsion;
+                    velocity.y += (dy2 / dist2) * repulsion;
+                }
+            });
+
+            // Apply damping
+            velocity.x *= 0.85;
+            velocity.y *= 0.85;
+
+            // Update position
+            node.position({
+                x: pos.x + velocity.x,
+                y: pos.y + velocity.y
+            });
+
+            node.scratch('_velocity', velocity);
         });
+
+        // Update previous position
+        prevDragPos = { x: dragPos.x, y: dragPos.y };
     });
 
     cy.on('free', 'node', function(evt) {
@@ -277,8 +321,8 @@ function initGraph() {
                 if (!velocity) return;
 
                 // Apply damping
-                velocity.x *= 0.85;
-                velocity.y *= 0.85;
+                velocity.x *= 0.88;
+                velocity.y *= 0.88;
 
                 // Check if still moving significantly
                 if (Math.abs(velocity.x) > 0.1 || Math.abs(velocity.y) > 0.1) {
@@ -300,9 +344,12 @@ function initGraph() {
                 connectedNodes.forEach(node => {
                     node.removeScratch('_velocity');
                     node.removeScratch('_dragging');
+                    node.removeScratch('_originalDist');
+                    node.removeScratch('_angle');
                 });
                 draggedNode = null;
                 connectedNodes = null;
+                prevDragPos = null;
             }
         };
 

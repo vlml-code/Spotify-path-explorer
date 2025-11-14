@@ -3,7 +3,7 @@ let cy = null;
 let map = null;
 let currentArtistId = null;
 let allArtists = [];
-let currentRating = 5;
+let currentRating = 0;  // Default to 0 (no rating)
 let artistMarkers = []; // Store map markers
 
 // Proper CSV parser that handles quotes, escaping, and newlines
@@ -968,12 +968,23 @@ async function addRelatedArtists() {
         const relatedArtists = [];
 
         for (const row of rows) {
-            // Expected format: name, location
+            // Expected format: name, location, genres
             if (row.length >= 1 && row[0]) {
-                relatedArtists.push({
+                const artistData = {
                     name: row[0],
                     location: row[1] || null
-                });
+                };
+
+                // Parse genres (third field, comma-separated)
+                if (row[2] && row[2].trim()) {
+                    // Split by comma and clean up each genre
+                    artistData.genres = row[2]
+                        .split(',')
+                        .map(g => g.trim())
+                        .filter(g => g.length > 0);
+                }
+
+                relatedArtists.push(artistData);
             }
         }
 
@@ -1198,7 +1209,7 @@ function clearForm() {
     document.getElementById('location').value = '';
     document.getElementById('explored').checked = false;
     document.getElementById('relatedArtistsCSV').value = '';
-    updateStars(5);
+    updateStars(0);
 }
 
 // Show/hide loading overlay

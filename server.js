@@ -25,11 +25,16 @@ app.get('/api/artists', (req, res) => {
   }
 });
 
-// Get graph data
+// Get graph data (with genres)
 app.get('/api/graph', (req, res) => {
   try {
     const data = db.getGraphData();
-    res.json(data);
+    // Add genres to each artist
+    const artistsWithGenres = data.artists.map(artist => ({
+      ...artist,
+      genres: db.getArtistGenres(artist.id)
+    }));
+    res.json({ ...data, artists: artistsWithGenres });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -52,7 +57,7 @@ app.get('/api/artists/:id', (req, res) => {
 // Create or update artist
 app.post('/api/artists', (req, res) => {
   try {
-    const { name, location, rating, explored } = req.body;
+    const { name, location, rating, explored, genres } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Artist name is required' });
@@ -66,7 +71,18 @@ app.post('/api/artists', (req, res) => {
       artist = db.updateArtist(artist.id, { rating, explored, location });
     }
 
-    res.json(artist);
+    // Handle genres
+    if (genres && Array.isArray(genres)) {
+      db.setArtistGenres(artist.id, genres);
+    }
+
+    // Return artist with genres
+    const artistWithGenres = {
+      ...artist,
+      genres: db.getArtistGenres(artist.id)
+    };
+
+    res.json(artistWithGenres);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -87,7 +103,7 @@ app.put('/api/artists/:id', (req, res) => {
 app.post('/api/artists/:id/related', (req, res) => {
   try {
     const artistId = parseInt(req.params.id);
-    const { relatedArtists } = req.body; // Array of { name, location }
+    const { relatedArtists } = req.body; // Array of { name, location, genres }
 
     if (!Array.isArray(relatedArtists)) {
       return res.status(400).json({ error: 'relatedArtists must be an array' });
@@ -95,15 +111,23 @@ app.post('/api/artists/:id/related', (req, res) => {
 
     const results = [];
 
-    for (const { name, location } of relatedArtists) {
+    for (const { name, location, genres } of relatedArtists) {
       if (name && name.trim()) {
         // Get or create the related artist
         const relatedArtist = db.getOrCreateArtist(name.trim(), location?.trim() || null);
 
+        // Add genres if provided
+        if (genres && Array.isArray(genres) && genres.length > 0) {
+          db.setArtistGenres(relatedArtist.id, genres);
+        }
+
         // Add relationship (if not the same artist)
         if (relatedArtist.id !== artistId) {
           db.addRelationship(artistId, relatedArtist.id);
-          results.push(relatedArtist);
+          results.push({
+            ...relatedArtist,
+            genres: db.getArtistGenres(relatedArtist.id)
+          });
         }
       }
     }

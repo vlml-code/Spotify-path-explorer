@@ -596,36 +596,58 @@ body {
 
 /* Custom Leaflet popup styling */
 .leaflet-popup-content-wrapper {
-    background: var(--bg-medium);
+    background: var(--bg-light);
     color: var(--text-primary);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 4px 16px var(--shadow-lg);
+    border: 2px solid var(--primary);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    padding: 0;
 }
 
 .leaflet-popup-content {
-    margin: 12px;
+    margin: 0;
     line-height: 1.5;
 }
 
 .leaflet-popup-tip {
-    background: var(--bg-medium);
+    background: var(--bg-light);
+    border: 2px solid var(--primary);
+    border-top: none;
+    border-right: none;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+    color: var(--text-secondary);
+    font-size: 20px;
+    padding: 8px 8px 0 0;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+    color: var(--text-primary);
 }
 
 .artist-popup {
     min-width: 200px;
+    padding: 16px;
 }
 
 .artist-popup h4 {
     color: var(--primary);
-    margin-bottom: 8px;
-    font-size: 1.1rem;
+    margin: 0 0 12px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
 }
 
 .artist-popup p {
-    margin: 4px 0;
-    font-size: 0.9rem;
+    margin: 8px 0;
+    font-size: 0.95rem;
     color: var(--text-secondary);
+}
+
+.artist-popup p i {
+    color: var(--primary);
+    width: 20px;
+    margin-right: 4px;
 }
 
 .artist-popup .rating {
@@ -638,6 +660,37 @@ body {
 
 .artist-popup .unexplored {
     color: var(--unexplored);
+}
+
+.artist-popup .artist-name {
+    color: var(--primary);
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.artist-popup .artist-name:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
+.artist-popup .artist-item {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.artist-popup .artist-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.artist-popup .location-header {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    margin-bottom: 8px;
 }
 
 /* Responsive */

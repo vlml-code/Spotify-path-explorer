@@ -366,7 +366,11 @@ async function displayArtistsOnMap() {
 function createSingleArtistPopup(artist) {
     return `
         <div class="artist-popup">
-            <h4>${artist.name}</h4>
+            <h4>
+                <a href="#" class="artist-name" onclick="selectArtistFromMap(${artist.id}); return false;">
+                    ${artist.name}
+                </a>
+            </h4>
             <p><i class="fas fa-map-marker-alt"></i> ${artist.location || 'Unknown'}</p>
             <p class="rating"><i class="fas fa-star"></i> ${artist.rating || 5}/10</p>
             <p class="${artist.explored === 1 ? 'explored' : 'unexplored'}">
@@ -380,8 +384,10 @@ function createSingleArtistPopup(artist) {
 // Create popup for multiple artists at same location
 function createMultiArtistPopup(artists) {
     const artistList = artists.map(artist => `
-        <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #333;">
-            <strong>${artist.name}</strong><br>
+        <div class="artist-item">
+            <a href="#" class="artist-name" onclick="selectArtistFromMap(${artist.id}); return false;">
+                ${artist.name}
+            </a><br>
             <span class="rating"><i class="fas fa-star"></i> ${artist.rating || 5}/10</span> -
             <span class="${artist.explored === 1 ? 'explored' : 'unexplored'}">
                 ${artist.explored === 1 ? 'Explored' : 'Not explored'}
@@ -391,12 +397,57 @@ function createMultiArtistPopup(artists) {
 
     return `
         <div class="artist-popup">
-            <h4>${artists[0].location}</h4>
+            <h4 class="location-header"><i class="fas fa-map-marker-alt"></i> ${artists[0].location}</h4>
             <p style="margin-bottom: 12px;"><i class="fas fa-users"></i> ${artists.length} artists</p>
             ${artistList}
         </div>
     `;
 }
+
+// Select artist from map popup and highlight in graph
+window.selectArtistFromMap = function(artistId) {
+    console.log('[Map] Selecting artist from map:', artistId);
+
+    // Find the artist node in the graph
+    const node = cy.getElementById(artistId.toString());
+
+    if (node.length > 0) {
+        // Unselect all nodes first
+        cy.nodes().unselect();
+
+        // Select the target node
+        node.select();
+
+        // Show node info panel
+        const artist = allArtists.find(a => a.id === artistId);
+        if (artist) {
+            showNodeInfo(node.data());
+        }
+
+        // Scroll to the graph section smoothly
+        const graphSection = document.querySelector('.view-section:first-child');
+        if (graphSection) {
+            graphSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // Animate to center on the selected node
+        setTimeout(() => {
+            cy.animate({
+                fit: {
+                    eles: node,
+                    padding: 100
+                },
+                duration: 500,
+                easing: 'ease-out'
+            });
+        }, 300);
+
+        console.log('[Map] Artist selected and graph centered');
+    } else {
+        console.warn('[Map] Artist node not found in graph:', artistId);
+        showToast('Artist not found in graph', 'warning');
+    }
+};
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {

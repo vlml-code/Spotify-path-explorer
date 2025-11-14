@@ -91,19 +91,51 @@ http://localhost:3000
 
 ## CSV Format
 
-The CSV format for adding related artists is:
+The CSV format for adding related artists supports full CSV formatting rules:
 ```
 artist_name, location
 ```
 
-Example:
-```
+### Basic Examples:
+```csv
 The Beatles, UK
 Pink Floyd, UK
 Led Zeppelin, UK
 ```
 
-Location is optional. Each line represents one artist.
+### Advanced CSV Features Supported:
+
+**Quoted values** (for names/locations with commas):
+```csv
+"Smith, John", "New York, NY"
+AC/DC, Australia
+```
+
+**Escaped quotes** (use double quotes to include a quote):
+```csv
+"John ""The Boss"" Smith", USA
+"She said ""Hello""", UK
+```
+
+**Optional location**:
+```csv
+Taylor Swift, USA
+Adele
+Ed Sheeran, UK
+```
+
+**Multi-line values** (within quotes):
+```csv
+"Artist with
+multiple line name", Location
+```
+
+The parser handles:
+- Quoted fields containing commas
+- Escaped double quotes (`""`)
+- Both CRLF and LF line endings
+- Leading/trailing whitespace trimming
+- Empty fields
 
 ## Database
 

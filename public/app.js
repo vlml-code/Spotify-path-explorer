@@ -4,6 +4,60 @@ let currentArtistId = null;
 let allArtists = [];
 let currentRating = 5;
 
+// Proper CSV parser that handles quotes, escaping, and newlines
+function parseCSV(csvText) {
+    const rows = [];
+    let currentRow = [];
+    let currentField = '';
+    let insideQuotes = false;
+
+    for (let i = 0; i < csvText.length; i++) {
+        const char = csvText[i];
+        const nextChar = csvText[i + 1];
+
+        if (char === '"') {
+            if (insideQuotes && nextChar === '"') {
+                // Escaped quote - add one quote to field
+                currentField += '"';
+                i++; // Skip next quote
+            } else {
+                // Toggle quote state
+                insideQuotes = !insideQuotes;
+            }
+        } else if (char === ',' && !insideQuotes) {
+            // End of field
+            currentRow.push(currentField.trim());
+            currentField = '';
+        } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+            // End of row
+            if (char === '\r' && nextChar === '\n') {
+                i++; // Skip \n in \r\n
+            }
+            if (currentField || currentRow.length > 0) {
+                currentRow.push(currentField.trim());
+                if (currentRow.some(field => field)) {
+                    rows.push(currentRow);
+                }
+                currentRow = [];
+                currentField = '';
+            }
+        } else {
+            // Regular character
+            currentField += char;
+        }
+    }
+
+    // Add last field and row if any
+    if (currentField || currentRow.length > 0) {
+        currentRow.push(currentField.trim());
+        if (currentRow.some(field => field)) {
+            rows.push(currentRow);
+        }
+    }
+
+    return rows;
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     initGraph();
@@ -334,14 +388,14 @@ async function saveArtist() {
 
 // Add related artists from CSV
 async function addRelatedArtists() {
-    const csv = document.getElementById('relatedArtistsCSV').value.trim();
+    const csv = document.getElementById('relatedArtistsCSV').value;
 
     if (!currentArtistId) {
         showToast('Please save an artist first before adding related artists', 'warning');
         return;
     }
 
-    if (!csv) {
+    if (!csv.trim()) {
         showToast('Please enter related artists in CSV format', 'warning');
         return;
     }
@@ -349,16 +403,16 @@ async function addRelatedArtists() {
     showLoading(true);
 
     try {
-        // Parse CSV
-        const lines = csv.split('\n').filter(line => line.trim());
+        // Parse CSV with proper CSV handling
+        const rows = parseCSV(csv);
         const relatedArtists = [];
 
-        for (const line of lines) {
-            const parts = line.split(',').map(p => p.trim());
-            if (parts.length >= 1 && parts[0]) {
+        for (const row of rows) {
+            // Expected format: name, location
+            if (row.length >= 1 && row[0]) {
                 relatedArtists.push({
-                    name: parts[0],
-                    location: parts[1] || null
+                    name: row[0],
+                    location: row[1] || null
                 });
             }
         }
@@ -402,9 +456,20 @@ async function loadGraphData() {
 
         allArtists = data.artists;
 
+        // Deduplicate edges for accurate stats (since relationships are bidirectional in DB)
+        const seenEdgesForStats = new Set();
+        const uniqueConnectionCount = data.relationships.filter(rel => {
+            const id1 = Math.min(rel.artist_id, rel.related_artist_id);
+            const id2 = Math.max(rel.artist_id, rel.related_artist_id);
+            const key = `${id1}-${id2}`;
+            if (seenEdgesForStats.has(key)) return false;
+            seenEdgesForStats.add(key);
+            return true;
+        }).length;
+
         // Update stats
         document.getElementById('totalArtists').textContent = data.artists.length;
-        document.getElementById('totalConnections').textContent = data.relationships.length;
+        document.getElementById('totalConnections').textContent = uniqueConnectionCount;
 
         // Clear and rebuild graph
         cy.elements().remove();
@@ -421,8 +486,23 @@ async function loadGraphData() {
             }
         }));
 
+        // Deduplicate edges (since relationships are bidirectional in DB)
+        // Only keep one edge per pair by using a Set with sorted IDs
+        const seenEdges = new Set();
+        const uniqueRelationships = data.relationships.filter(rel => {
+            const id1 = Math.min(rel.artist_id, rel.related_artist_id);
+            const id2 = Math.max(rel.artist_id, rel.related_artist_id);
+            const key = `${id1}-${id2}`;
+
+            if (seenEdges.has(key)) {
+                return false;
+            }
+            seenEdges.add(key);
+            return true;
+        });
+
         // Add edges
-        const edges = data.relationships.map((rel, index) => ({
+        const edges = uniqueRelationships.map((rel, index) => ({
             group: 'edges',
             data: {
                 id: `edge-${index}`,

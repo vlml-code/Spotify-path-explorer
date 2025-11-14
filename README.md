@@ -5,6 +5,10 @@ A modern, animated web application for exploring relationships between artists. 
 ## Features
 
 - **Interactive Graph Visualization**: Beautiful, animated network graph showing artist relationships
+- **Physics-Based Dragging**: Drag nodes and connected artists follow with spring-like physics
+  - Smooth gravitational pull on connected nodes
+  - Realistic spring forces and damping
+  - Momentum-based deceleration after release
 - **Artist Management**: Add, edit, and rate artists (1-10 stars)
 - **Relationship Tracking**: Connect artists and visualize their network
 - **CSV Import**: Bulk import related artists using CSV format
@@ -68,6 +72,9 @@ http://localhost:3000
 - **Click** on a node to view artist details
 - **Hover** over nodes to highlight connections
 - **Drag** nodes to reposition them
+  - Connected nodes follow with spring physics
+  - Great for organizing clusters of related artists
+  - Nodes have momentum and smoothly decelerate
 - **Scroll** to zoom in/out
 - **Pan** by dragging the background
 - Use the controls to:
@@ -150,7 +157,8 @@ Database file: `artists.db` (auto-created on first run)
 
 - **Backend**: Node.js (v22.5.0+), Express, Built-in SQLite module
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
-- **Graph**: Cytoscape.js
+- **Graph**: Cytoscape.js with Cola.js layout for force-directed physics
+- **Physics**: Custom spring-based drag system with momentum and damping
 - **Database**: SQLite (via Node.js built-in module - no native compilation required!)
 
 ## API Endpoints

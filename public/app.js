@@ -60,6 +60,11 @@ function parseCSV(csvText) {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    // Register cola extension
+    if (typeof cytoscape !== 'undefined' && typeof cola !== 'undefined') {
+        cytoscape.use(cytoscapeCola);
+    }
+
     initGraph();
     initEventListeners();
     loadGraphData();
@@ -200,6 +205,111 @@ function initGraph() {
             'width': 2,
             'opacity': 0.6
         });
+    });
+
+    // Drag physics - make connected nodes follow with gravity
+    let draggedNode = null;
+    let connectedNodes = null;
+    let animationId = null;
+    const springStrength = 0.15; // How strong the pull is
+    const damping = 0.75; // Reduces oscillation
+
+    cy.on('grab', 'node', function(evt) {
+        draggedNode = evt.target;
+
+        // Get all connected nodes (direct neighbors)
+        connectedNodes = draggedNode.connectedEdges().connectedNodes().filter(n => n.id() !== draggedNode.id());
+
+        // Store initial positions and velocities
+        connectedNodes.forEach(node => {
+            node.scratch('_velocity', { x: 0, y: 0 });
+            node.scratch('_dragging', true);
+        });
+    });
+
+    cy.on('drag', 'node', function(evt) {
+        if (!draggedNode || !connectedNodes) return;
+
+        const dragPos = draggedNode.position();
+
+        // Apply spring force to connected nodes
+        connectedNodes.forEach(node => {
+            const pos = node.position();
+            const velocity = node.scratch('_velocity') || { x: 0, y: 0 };
+
+            // Calculate spring force (Hooke's law)
+            const dx = dragPos.x - pos.x;
+            const dy = dragPos.y - pos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > 0) {
+                // Spring force proportional to distance
+                const force = distance * springStrength;
+                const fx = (dx / distance) * force;
+                const fy = (dy / distance) * force;
+
+                // Update velocity with damping
+                velocity.x = (velocity.x + fx) * damping;
+                velocity.y = (velocity.y + fy) * damping;
+
+                // Update position
+                node.position({
+                    x: pos.x + velocity.x,
+                    y: pos.y + velocity.y
+                });
+
+                node.scratch('_velocity', velocity);
+            }
+        });
+    });
+
+    cy.on('free', 'node', function(evt) {
+        if (!draggedNode || !connectedNodes) return;
+
+        // Smooth deceleration after release
+        const decelerate = () => {
+            let stillMoving = false;
+
+            connectedNodes.forEach(node => {
+                if (!node.scratch('_dragging')) return;
+
+                const velocity = node.scratch('_velocity');
+                if (!velocity) return;
+
+                // Apply damping
+                velocity.x *= 0.85;
+                velocity.y *= 0.85;
+
+                // Check if still moving significantly
+                if (Math.abs(velocity.x) > 0.1 || Math.abs(velocity.y) > 0.1) {
+                    stillMoving = true;
+                    const pos = node.position();
+                    node.position({
+                        x: pos.x + velocity.x,
+                        y: pos.y + velocity.y
+                    });
+                } else {
+                    node.scratch('_dragging', false);
+                }
+            });
+
+            if (stillMoving) {
+                animationId = requestAnimationFrame(decelerate);
+            } else {
+                // Cleanup
+                connectedNodes.forEach(node => {
+                    node.removeScratch('_velocity');
+                    node.removeScratch('_dragging');
+                });
+                draggedNode = null;
+                connectedNodes = null;
+            }
+        };
+
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+        }
+        decelerate();
     });
 }
 
@@ -513,21 +623,35 @@ async function loadGraphData() {
 
         cy.add([...nodes, ...edges]);
 
-        // Run layout with animation
+        // Run layout with animation - using cola for better spring physics
         const layout = cy.layout({
-            name: 'cose',
+            name: 'cola',
             animate: true,
             animationDuration: 1000,
             animationEasing: 'ease-out',
-            nodeRepulsion: 8000,
-            idealEdgeLength: 100,
-            edgeElasticity: 100,
-            nestingFactor: 5,
-            gravity: 80,
-            numIter: 1000,
-            initialTemp: 200,
-            coolingFactor: 0.95,
-            minTemp: 1.0
+            refresh: 1,
+            maxSimulationTime: 2000,
+            ungrabifyWhileSimulating: false,
+            fit: true,
+            padding: 50,
+            nodeDimensionsIncludeLabels: true,
+            // Physics parameters
+            edgeLength: 100,
+            edgeSymDiffLength: undefined,
+            edgeJaccardLength: undefined,
+            nodeSpacing: 40,
+            flow: undefined,
+            alignment: undefined,
+            gapInequalities: undefined,
+            // Spring physics
+            randomize: false,
+            avoidOverlap: true,
+            handleDisconnected: true,
+            convergenceThreshold: 0.01,
+            // Make nodes stick together more naturally
+            unconstrIter: undefined,
+            userConstIter: undefined,
+            allConstIter: undefined
         });
 
         layout.run();

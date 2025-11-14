@@ -72,20 +72,34 @@ async function geocodeLocation(location) {
 
     // Check cache first
     if (locationCache[locationKey]) {
+        console.log(`[Geocode] Using cached coordinates for "${location}"`);
         return locationCache[locationKey];
     }
 
+    console.log(`[Geocode] Fetching coordinates for "${location}"...`);
+
     try {
-        // Use Nominatim (OpenStreetMap) geocoding service
+        // Use Nominatim (OpenStreetMap) geocoding service with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
         const response = await fetch(
             `https://nominatim.openstreetmap.org/search?` +
             `q=${encodeURIComponent(location)}&format=json&limit=1`,
             {
                 headers: {
                     'User-Agent': 'Artist-Explorer-App'
-                }
+                },
+                signal: controller.signal
             }
         );
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            console.warn(`[Geocode] HTTP error ${response.status} for "${location}"`);
+            return null;
+        }
 
         const data = await response.json();
 
@@ -95,134 +109,200 @@ async function geocodeLocation(location) {
                 lng: parseFloat(data[0].lon)
             };
             locationCache[locationKey] = coords;
+            console.log(`[Geocode] Found coordinates for "${location}":`, coords);
             return coords;
+        } else {
+            console.warn(`[Geocode] No results found for "${location}"`);
+            return null;
         }
     } catch (error) {
-        console.error('Geocoding error:', error);
+        if (error.name === 'AbortError') {
+            console.error(`[Geocode] Timeout for "${location}"`);
+        } else {
+            console.error(`[Geocode] Error for "${location}":`, error);
+        }
+        return null;
     }
-
-    return null;
 }
 
 // Initialize Leaflet map
 function initMap() {
-    if (!map) {
-        map = L.map('map', {
-            center: [20, 0],
-            zoom: 2,
-            minZoom: 2,
-            maxZoom: 18,
-            worldCopyJump: true
-        });
+    console.log('[Map] initMap called');
 
-        // Add dark theme tile layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(map);
+    if (!map) {
+        if (typeof L === 'undefined') {
+            console.error('[Map] Leaflet (L) is not defined! Make sure Leaflet library is loaded.');
+            showToast('Map library not loaded', 'error');
+            return;
+        }
+
+        console.log('[Map] Creating Leaflet map...');
+        try {
+            map = L.map('map', {
+                center: [20, 0],
+                zoom: 2,
+                minZoom: 2,
+                maxZoom: 18,
+                worldCopyJump: true
+            });
+
+            console.log('[Map] Adding tile layer...');
+            // Add dark theme tile layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            console.log('[Map] Map initialized successfully');
+        } catch (error) {
+            console.error('[Map] Error initializing map:', error);
+            showToast('Error initializing map: ' + error.message, 'error');
+        }
+    } else {
+        console.log('[Map] Map already exists');
     }
 }
 
 // Display artists on the map
 async function displayArtistsOnMap() {
-    if (!map) {
-        initMap();
-    }
+    console.log('[Map] Starting displayArtistsOnMap...');
+    console.log('[Map] Total artists:', allArtists.length);
 
-    // Clear existing markers
-    artistMarkers.forEach(marker => map.removeLayer(marker));
-    artistMarkers = [];
+    try {
+        if (!map) {
+            console.log('[Map] Initializing map...');
+            initMap();
+        }
 
-    showLoading(true);
+        // Clear existing markers
+        console.log('[Map] Clearing existing markers...');
+        artistMarkers.forEach(marker => map.removeLayer(marker));
+        artistMarkers = [];
 
-    // Group artists by location to handle multiple artists in same city
-    const artistsByLocation = {};
-    const artistsWithoutLocation = [];
+        showLoading(true);
 
-    for (const artist of allArtists) {
-        if (artist.location && artist.location.trim()) {
-            const locationKey = artist.location.toLowerCase().trim();
-            if (!artistsByLocation[locationKey]) {
-                artistsByLocation[locationKey] = [];
+        // Group artists by location to handle multiple artists in same city
+        const artistsByLocation = {};
+        const artistsWithoutLocation = [];
+
+        for (const artist of allArtists) {
+            if (artist.location && artist.location.trim()) {
+                const locationKey = artist.location.toLowerCase().trim();
+                if (!artistsByLocation[locationKey]) {
+                    artistsByLocation[locationKey] = [];
+                }
+                artistsByLocation[locationKey].push(artist);
+            } else {
+                artistsWithoutLocation.push(artist);
             }
-            artistsByLocation[locationKey].push(artist);
+        }
+
+        const totalLocations = Object.keys(artistsByLocation).length;
+        console.log(`[Map] Found ${totalLocations} unique locations`);
+        console.log(`[Map] Artists without location: ${artistsWithoutLocation.length}`);
+
+        if (totalLocations === 0) {
+            showLoading(false);
+            showToast('No artists with location data to display on map', 'warning');
+            return;
+        }
+
+        // Geocode and add markers for each location
+        let geocodedCount = 0;
+        let processedCount = 0;
+
+        for (const [locationKey, artists] of Object.entries(artistsByLocation)) {
+            processedCount++;
+            console.log(`[Map] Processing location ${processedCount}/${totalLocations}: "${artists[0].location}"`);
+
+            try {
+                const coords = await geocodeLocation(artists[0].location);
+
+                if (coords) {
+                    geocodedCount++;
+
+                    // Create custom icon based on explored status
+                    const iconColor = artists.some(a => a.explored === 1) ? '#1db954' : '#e67e22';
+                    const iconHtml = `
+                        <div style="
+                            background-color: ${iconColor};
+                            width: 30px;
+                            height: 30px;
+                            border-radius: 50%;
+                            border: 3px solid #fff;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 12px;
+                        ">
+                            ${artists.length > 1 ? artists.length : '♪'}
+                        </div>
+                    `;
+
+                    const customIcon = L.divIcon({
+                        html: iconHtml,
+                        className: 'custom-artist-marker',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15],
+                        popupAnchor: [0, -15]
+                    });
+
+                    // Create popup content
+                    const popupContent = artists.length === 1 ?
+                        createSingleArtistPopup(artists[0]) :
+                        createMultiArtistPopup(artists);
+
+                    const marker = L.marker([coords.lat, coords.lng], { icon: customIcon })
+                        .bindPopup(popupContent)
+                        .addTo(map);
+
+                    artistMarkers.push(marker);
+                    console.log(`[Map] Added marker ${geocodedCount} for "${artists[0].location}"`);
+                }
+
+                // Add delay to respect Nominatim rate limits (1 request per second)
+                if (processedCount < totalLocations) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (error) {
+                console.error(`[Map] Error processing location "${artists[0].location}":`, error);
+                // Continue to next location even if this one fails
+            }
+        }
+
+        console.log(`[Map] Geocoding complete: ${geocodedCount}/${totalLocations} successful`);
+
+        if (artistsWithoutLocation.length > 0) {
+            showToast(`${artistsWithoutLocation.length} artist(s) without location data`, 'warning');
+        }
+
+        if (geocodedCount === 0 && totalLocations > 0) {
+            showToast('Could not geocode any locations', 'error');
+        } else if (geocodedCount > 0) {
+            showToast(`Displayed ${geocodedCount} location(s) on map`, 'success');
+        }
+
+        // Fit map to show all markers
+        if (artistMarkers.length > 0) {
+            console.log(`[Map] Fitting map bounds to ${artistMarkers.length} markers`);
+            const group = L.featureGroup(artistMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
         } else {
-            artistsWithoutLocation.push(artist);
-        }
-    }
-
-    // Geocode and add markers for each location
-    let geocodedCount = 0;
-    const totalLocations = Object.keys(artistsByLocation).length;
-
-    for (const [locationKey, artists] of Object.entries(artistsByLocation)) {
-        const coords = await geocodeLocation(artists[0].location);
-
-        if (coords) {
-            geocodedCount++;
-
-            // Create custom icon based on explored status
-            const iconColor = artists.some(a => a.explored === 1) ? '#1db954' : '#e67e22';
-            const iconHtml = `
-                <div style="
-                    background-color: ${iconColor};
-                    width: 30px;
-                    height: 30px;
-                    border-radius: 50%;
-                    border: 3px solid #fff;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-weight: bold;
-                    font-size: 12px;
-                ">
-                    ${artists.length > 1 ? artists.length : '♪'}
-                </div>
-            `;
-
-            const customIcon = L.divIcon({
-                html: iconHtml,
-                className: 'custom-artist-marker',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15],
-                popupAnchor: [0, -15]
-            });
-
-            // Create popup content
-            const popupContent = artists.length === 1 ?
-                createSingleArtistPopup(artists[0]) :
-                createMultiArtistPopup(artists);
-
-            const marker = L.marker([coords.lat, coords.lng], { icon: customIcon })
-                .bindPopup(popupContent)
-                .addTo(map);
-
-            artistMarkers.push(marker);
+            console.log('[Map] No markers to display');
         }
 
-        // Add delay to respect Nominatim rate limits (1 request per second)
-        if (geocodedCount < totalLocations) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-    }
-
-    showLoading(false);
-
-    if (artistsWithoutLocation.length > 0) {
-        showToast(`${artistsWithoutLocation.length} artist(s) without location data`, 'warning');
-    }
-
-    if (geocodedCount === 0 && totalLocations > 0) {
-        showToast('Could not geocode any locations', 'error');
-    }
-
-    // Fit map to show all markers
-    if (artistMarkers.length > 0) {
-        const group = L.featureGroup(artistMarkers);
-        map.fitBounds(group.getBounds().pad(0.1));
+        console.log('[Map] displayArtistsOnMap complete');
+    } catch (error) {
+        console.error('[Map] Fatal error in displayArtistsOnMap:', error);
+        showToast('Error displaying map: ' + error.message, 'error');
+    } finally {
+        // Always hide loading, even if there's an error
+        console.log('[Map] Hiding loading overlay');
+        showLoading(false);
     }
 }
 
@@ -264,6 +344,7 @@ function createMultiArtistPopup(artists) {
 
 // Toggle between graph and map views
 function toggleView() {
+    console.log('[View] toggleView called, current view:', currentView);
     const graphContainer = document.getElementById('cy');
     const mapContainer = document.getElementById('map');
     const toggleBtn = document.getElementById('toggleView');
@@ -272,6 +353,7 @@ function toggleView() {
 
     if (currentView === 'graph') {
         // Switch to map view
+        console.log('[View] Switching to map view...');
         currentView = 'map';
         graphContainer.classList.add('hidden');
         mapContainer.classList.remove('hidden');
@@ -281,16 +363,21 @@ function toggleView() {
 
         // Initialize and display map
         if (!map) {
+            console.log('[View] Map not initialized, initializing now...');
             initMap();
+        } else {
+            console.log('[View] Map already initialized');
         }
 
         // Invalidate size to fix display issues
         setTimeout(() => {
+            console.log('[View] Invalidating map size and displaying artists...');
             map.invalidateSize();
             displayArtistsOnMap();
         }, 100);
     } else {
         // Switch to graph view
+        console.log('[View] Switching to graph view...');
         currentView = 'graph';
         graphContainer.classList.remove('hidden');
         mapContainer.classList.add('hidden');

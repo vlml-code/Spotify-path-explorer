@@ -455,6 +455,31 @@ window.selectArtistFromMap = function(artistId) {
     }
 };
 
+// Select a random unexplored artist
+function selectRandomUnexploredArtist() {
+    console.log('[Random] Selecting random unexplored artist');
+
+    // Filter for unexplored artists, considering genre filters if active
+    const filteredArtists = getFilteredArtists();
+    const unexploredArtists = filteredArtists.filter(artist => !artist.explored);
+
+    if (unexploredArtists.length === 0) {
+        showToast('No unexplored artists found', 'warning');
+        return;
+    }
+
+    // Select a random unexplored artist
+    const randomIndex = Math.floor(Math.random() * unexploredArtists.length);
+    const randomArtist = unexploredArtists[randomIndex];
+
+    console.log('[Random] Selected artist:', randomArtist.name);
+
+    // Use the existing function to select and display the artist
+    selectArtistFromMap(randomArtist.id);
+
+    showToast(`Selected: ${randomArtist.name}`, 'success');
+}
+
 // Load genres from API
 async function loadGenres() {
     try {
@@ -627,12 +652,14 @@ function initGraph() {
                     'font-size': '12px',
                     'font-weight': 'bold',
                     'width': function(ele) {
-                        const rating = ele.data('rating') || 5;
-                        return 30 + (rating * 3);
+                        const degree = ele.degree();
+                        // Base size 40px, add 5px per connection, max 100px
+                        return Math.min(40 + (degree * 5), 100);
                     },
                     'height': function(ele) {
-                        const rating = ele.data('rating') || 5;
-                        return 30 + (rating * 3);
+                        const degree = ele.degree();
+                        // Base size 40px, add 5px per connection, max 100px
+                        return Math.min(40 + (degree * 5), 100);
                     },
                     'text-wrap': 'wrap',
                     'text-max-width': '80px',
@@ -915,6 +942,8 @@ function initEventListeners() {
     document.getElementById('addRelated').addEventListener('click', addRelatedArtists);
 
     // Graph controls
+    document.getElementById('randomArtist').addEventListener('click', selectRandomUnexploredArtist);
+
     document.getElementById('fitGraph').addEventListener('click', () => {
         cy.fit(null, 50);
         cy.animate({

@@ -1303,13 +1303,15 @@ function showNodeInfo(nodeData) {
             const connectedArtist = allArtists.find(a => a.id === parseInt(n.id()));
             return {
                 id: n.id(),
-                name: connectedArtist ? connectedArtist.name : n.data('label')
+                name: connectedArtist ? connectedArtist.name : n.data('label'),
+                explored: connectedArtist ? connectedArtist.explored : false
             };
         }).sort((a, b) => a.name.localeCompare(b.name));
 
-        const artistLinks = connectedArtists.map(artist =>
-            `<span class="connected-artist" data-artist-id="${artist.id}">${artist.name}</span>`
-        ).join('');
+        const artistLinks = connectedArtists.map(artist => {
+            const exploredClass = artist.explored ? 'explored' : '';
+            return `<span class="connected-artist ${exploredClass}" data-artist-id="${artist.id}">${artist.name}</span>`;
+        }).join('');
 
         connectionsContainer.innerHTML = `
             <p><i class="fas fa-link"></i> Connected to (${connectedNodes.length}):</p>

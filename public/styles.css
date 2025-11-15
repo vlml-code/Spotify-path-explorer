@@ -525,6 +525,11 @@ body {
     transform: translateY(-2px);
 }
 
+.connected-artist.explored {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 .node-genres {
     margin-top: 0.75rem;
     padding-top: 0.75rem;

@@ -89,15 +89,27 @@
                 </div>
             </div>
 
+            <!-- Artist Search Section -->
+            <div class="search-section">
+                <h3><i class="fas fa-search"></i> Search Artists</h3>
+                <input type="text" id="artistSearch" placeholder="Search by name..." class="search-input">
+                <div id="searchResults" class="search-results"></div>
+            </div>
+
             <!-- Genre Filter Section -->
             <div class="genre-filter-section">
-                <h3><i class="fas fa-filter"></i> Filter by Genre</h3>
-                <div id="genreFilters" class="genre-tags">
-                    <p class="help-text">Loading genres...</p>
+                <h3 class="collapsible-header" id="genreFilterHeader">
+                    <span><i class="fas fa-filter"></i> Filter by Genre</span>
+                    <i class="fas fa-chevron-down toggle-icon"></i>
+                </h3>
+                <div id="genreFilterContent" class="collapsible-content collapsed">
+                    <div id="genreFilters" class="genre-tags">
+                        <p class="help-text">Loading genres...</p>
+                    </div>
+                    <button id="clearFilters" class="btn btn-small btn-secondary" style="display: none; margin-top: 10px;">
+                        <i class="fas fa-times"></i> Clear Filters
+                    </button>
                 </div>
-                <button id="clearFilters" class="btn btn-small btn-secondary" style="display: none; margin-top: 10px;">
-                    <i class="fas fa-times"></i> Clear Filters
-                </button>
             </div>
 
             <!-- Stats -->

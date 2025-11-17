@@ -551,6 +551,58 @@ function clearGenreFilters() {
     updateVisualizationsWithFilter();
 }
 
+// Handle artist search input
+function handleArtistSearchInput(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    const resultsContainer = document.getElementById('searchResults');
+
+    if (!searchTerm) {
+        resultsContainer.innerHTML = '';
+        return;
+    }
+
+    // Filter artists based on search term
+    const filteredArtists = getFilteredArtists().filter(artist =>
+        artist.name.toLowerCase().includes(searchTerm)
+    ).slice(0, 10); // Limit to 10 results
+
+    if (filteredArtists.length === 0) {
+        resultsContainer.innerHTML = '<p class="help-text">No artists found</p>';
+        return;
+    }
+
+    // Display search results
+    resultsContainer.innerHTML = filteredArtists.map(artist => {
+        const exploredClass = artist.explored ? 'explored' : 'unexplored';
+        const icon = artist.explored ? 'fa-check-circle' : 'fa-circle';
+        return `
+            <div class="search-result-item ${exploredClass}" data-artist-id="${artist.id}">
+                <i class="fas ${icon}"></i>
+                <span>${artist.name}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Add click handlers to results
+    resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const artistId = parseInt(item.dataset.artistId);
+            selectArtistFromMap(artistId);
+            document.getElementById('artistSearch').value = '';
+            resultsContainer.innerHTML = '';
+        });
+    });
+}
+
+// Toggle genre filter collapse
+function toggleGenreFilter() {
+    const content = document.getElementById('genreFilterContent');
+    const icon = document.querySelector('.toggle-icon');
+
+    content.classList.toggle('collapsed');
+    icon.classList.toggle('rotated');
+}
+
 // Get filtered artists based on selected genres
 function getFilteredArtists() {
     if (selectedGenres.size === 0) {
@@ -971,6 +1023,12 @@ function initEventListeners() {
 
     // Clear genre filters
     document.getElementById('clearFilters').addEventListener('click', clearGenreFilters);
+
+    // Artist search
+    document.getElementById('artistSearch').addEventListener('input', handleArtistSearchInput);
+
+    // Genre filter collapse toggle
+    document.getElementById('genreFilterHeader').addEventListener('click', toggleGenreFilter);
 
     // Node info panel
     document.getElementById('closeNodeInfo').addEventListener('click', hideNodeInfo);

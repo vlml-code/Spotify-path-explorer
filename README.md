@@ -40,7 +40,7 @@ npm start
 
 3. Open your browser and navigate to:
 ```
-http://localhost:3000
+http://localhost:50101
 ```
 
 ## Usage
